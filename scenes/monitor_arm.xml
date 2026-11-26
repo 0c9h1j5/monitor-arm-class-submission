@@ -1,0 +1,261 @@
+<mujoco model="monitor_arm_articulated_6dof">
+  <compiler angle="radian" autolimits="true"/>
+  <option timestep="0.002" gravity="0 0 -9.81" integrator="implicitfast"/>
+
+  <visual>
+    <global offwidth="1600" offheight="1000" fovy="45"/>
+    <headlight diffuse="0.72 0.72 0.72" ambient="0.34 0.34 0.34" specular="0.15 0.15 0.15"/>
+    <rgba haze="0.93 0.95 0.97 1"/>
+  </visual>
+
+  <asset>
+    <texture name="tex_sky" type="skybox" builtin="gradient" width="512" height="512"
+             rgb1="0.93 0.95 0.98" rgb2="0.82 0.86 0.91"/>
+    <texture name="tex_floor" type="2d" builtin="checker" width="512" height="512"
+             rgb1="0.86 0.87 0.89" rgb2="0.78 0.80 0.83"/>
+    <material name="mat_floor" texture="tex_floor" texrepeat="6 6" reflectance="0.08"/>
+    <material name="mat_wood" rgba="0.73 0.57 0.41 1" specular="0.1" shininess="0.2"/>
+    <material name="mat_metal" rgba="0.28 0.31 0.36 1" specular="0.4" shininess="0.5"/>
+    <material name="mat_arm" rgba="0.18 0.20 0.25 1" specular="0.35" shininess="0.4"/>
+    <material name="mat_joint" rgba="0.42 0.46 0.53 1" specular="0.45" shininess="0.5"/>
+    <material name="mat_screen" rgba="0.11 0.16 0.24 1" specular="0.25" shininess="0.6"/>
+    <material name="mat_wall" rgba="0.90 0.91 0.93 1" specular="0.05"/>
+    <material name="mat_chair" rgba="0.22 0.24 0.28 1" specular="0.1"/>
+    <material name="mat_skin" rgba="0.87 0.75 0.65 1" specular="0.05"/>
+    <material name="mat_shirt" rgba="0.28 0.42 0.56 1" specular="0.05"/>
+    <material name="mat_pants" rgba="0.24 0.28 0.35 1" specular="0.05"/>
+    <material name="mat_shoe" rgba="0.16 0.16 0.18 1" specular="0.1"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0.8 -1.5 2.5" dir="-0.2 0.5 -0.8" diffuse="0.75 0.75 0.75" castshadow="true"/>
+    <light pos="-1.2 -0.6 2.0" dir="0.5 0.2 -0.8" diffuse="0.35 0.35 0.35" castshadow="false"/>
+
+    <!-- 바닥 (z = 0) -->
+    <geom name="floor" type="plane" size="2.8 2.8 0.05" material="mat_floor"/>
+
+    <!-- 뒷벽 (책상 뒷면 y = 0.35 m 기준 8 cm 뒤, 앞면 y = 0.43 m) -->
+    <body name="wall" pos="0 0.44 1.0">
+      <geom name="wall_geom" type="box" size="1.20 0.01 1.00" material="mat_wall"/>
+      <site name="wall_front" pos="0 -0.01 0" size="0.008" rgba="0.6 0.6 0.6 0.5"/>
+    </body>
+
+    <!-- 일반 사무 책상 (1.20 x 0.70 x 0.72 m, 상판 윗면 z = 0.72 m) -->
+    <body name="desk" pos="0 0 0">
+      <geom name="desk_top" type="box" pos="0 0 0.705" size="0.60 0.35 0.015" material="mat_wood"/>
+      <geom name="desk_leg_fl" type="box" pos="-0.55 -0.30 0.345" size="0.02 0.02 0.345" material="mat_metal"/>
+      <geom name="desk_leg_fr" type="box" pos="0.55 -0.30 0.345" size="0.02 0.02 0.345" material="mat_metal"/>
+      <geom name="desk_leg_bl" type="box" pos="-0.55 0.30 0.345" size="0.02 0.02 0.345" material="mat_metal"/>
+      <geom name="desk_leg_br" type="box" pos="0.55 0.30 0.345" size="0.02 0.02 0.345" material="mat_metal"/>
+      <site name="desk_surface" pos="0 0 0.72" size="0.008" rgba="0.5 0.5 0.5 0.6"/>
+    </body>
+
+    <!-- 수직 다관절 6축(RRRRRR) 모니터암 C-클램프 베이스 (책상 우측 뒤쪽 x = 0.38, y = 0.32, z = 0.72 m) -->
+    <body name="arm_base" pos="0.38 0.32 0.72">
+      <geom name="arm_clamp" type="box" pos="0 0.03 0.015" size="0.06 0.065 0.015"
+            contype="0" conaffinity="0" material="mat_arm"/>
+      <geom name="base_pedestal" type="cylinder" pos="0 0 0.045" size="0.048 0.03"
+            contype="0" conaffinity="0" material="mat_metal"/>
+
+      <!-- 1축: 베이스 수직축 회전 (base_yaw) -->
+      <body name="arm_turret" pos="0 0 0.10" gravcomp="1">
+        <joint name="base_yaw" type="hinge" axis="0 0 1" range="-2.60 2.60" damping="3.0"/>
+        <geom name="turret_geom" type="cylinder" pos="0 0 -0.01" size="0.040 0.035"
+              contype="0" conaffinity="0" mass="0.6" material="mat_joint"/>
+
+        <!-- 2축: 어깨 수평축 상하 꺾임 (shoulder_pitch, 하부 링크 L1 = 0.40 m) -->
+        <body name="arm_upper" pos="0 0 0" gravcomp="1">
+          <joint name="shoulder_pitch" type="hinge" axis="1 0 0" range="-1.50 1.50" damping="4.0"/>
+          <geom name="shoulder_hub" type="cylinder" pos="0 0 0" euler="0 1.5708 0"
+                size="0.036 0.036" contype="0" conaffinity="0" mass="0.3" material="mat_joint"/>
+          <geom name="upper_link" type="capsule" fromto="0 0 0.03 0 0 0.37" size="0.028"
+                mass="0.7" material="mat_arm"/>
+
+          <!-- 3축: 팔꿈치 수평축 상하 꺾임 (elbow_pitch, 상부 링크 L2 = 0.36 m, 총 도달 0.76 m) -->
+          <body name="arm_forearm" pos="0 0 0.40" gravcomp="1">
+            <joint name="elbow_pitch" type="hinge" axis="1 0 0" range="-2.70 2.70" damping="3.5"/>
+            <geom name="elbow_hub" type="cylinder" pos="0 0 0" euler="0 1.5708 0"
+                  size="0.032 0.032" contype="0" conaffinity="0" mass="0.25" material="mat_joint"/>
+            <geom name="forearm_link" type="capsule" fromto="0 0 0.03 0 0 0.33" size="0.023"
+                  mass="0.55" material="mat_metal"/>
+
+            <!-- 4축: 손목 좌우 회전 (wrist_yaw) -->
+            <body name="wrist_yaw_body" pos="0 0 0.36" gravcomp="1">
+              <joint name="wrist_yaw" type="hinge" axis="0 0 1" range="-3.1416 3.1416" damping="2.5"/>
+              <geom name="wrist_yaw_hub" type="cylinder" pos="0 0 0" size="0.024 0.024"
+                    contype="0" conaffinity="0" mass="0.2" material="mat_joint"/>
+
+              <!-- 5축: 손목 상하 기울기 (wrist_pitch) -->
+              <body name="wrist_pitch_body" pos="0 0 0" gravcomp="1">
+                <joint name="wrist_pitch" type="hinge" axis="1 0 0" range="-3.1416 3.1416" damping="2.5"/>
+                <geom name="wrist_pitch_hub" type="cylinder" pos="0 0 0" euler="0 1.5708 0"
+                      size="0.020 0.024" contype="0" conaffinity="0" mass="0.2" material="mat_arm"/>
+
+                <!-- 6축: 손목 가로·세로 피벗 (wrist_roll) + 27인치 모니터 (0.61 x 0.03 x 0.36 m, 4.5 kg) -->
+                <body name="monitor_mount" pos="0 0 0" gravcomp="1">
+                  <joint name="wrist_roll" type="hinge" axis="0 1 0" range="-3.1416 3.1416" damping="2.5"/>
+                  <geom name="vesa_plate" type="box" pos="0 -0.012 0" size="0.055 0.008 0.055"
+                        contype="0" conaffinity="0" mass="0.3" material="mat_metal"/>
+                  <geom name="monitor_panel" type="box" pos="0 -0.032 0" size="0.305 0.015 0.18"
+                        mass="4.5" material="mat_arm"/>
+                  <geom name="monitor_screen" type="box" pos="0 -0.0475 0" size="0.293 0.001 0.168"
+                        contype="0" conaffinity="0" mass="0.0" material="mat_screen"/>
+                  <site name="monitor_center" pos="0 -0.049 0" size="0.009" rgba="0.95 0.85 0.15 1"/>
+                  <site name="monitor_top" pos="0 -0.049 0.18" size="0.012" rgba="0.12 0.78 0.36 1"/>
+                  <site name="monitor_bottom" pos="0 -0.049 -0.18" size="0.010" rgba="0.95 0.55 0.12 1"/>
+                  <site name="monitor_top_portrait" pos="-0.305 -0.049 0" size="0.010" rgba="0.12 0.78 0.36 0.7"/>
+                  <site name="monitor_back" pos="0 -0.017 0" size="0.008" rgba="0.6 0.6 0.6 0.6"/>
+
+                  <!-- 모니터 상단 웹캠 (가로형 상단, 세로형 전환 시 측면 배치·90도 영상 보정 가정) -->
+                  <body name="webcam_unit" pos="0 -0.032 0.195" gravcomp="1">
+                    <geom name="webcam_body" type="box" pos="0 0 0" size="0.04 0.015 0.015"
+                          contype="0" conaffinity="0" mass="0.1" material="mat_metal"/>
+                    <geom name="webcam_lens_geom" type="cylinder" pos="0 -0.016 0" euler="1.5708 0 0"
+                          size="0.008 0.004" contype="0" conaffinity="0" mass="0.0" rgba="0.08 0.22 0.38 1"/>
+                    <camera name="webcam" pos="0 -0.022 0" xyaxes="-1 0 0 0 0 1" fovy="75"/>
+                    <site name="webcam_lens" pos="0 -0.021 0" size="0.006" rgba="0.20 0.62 0.98 1"/>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+
+    <!-- 사용자 머리 (mocap #0: 충돌 활성, 눈 위치 표시) -->
+    <body name="user_head" mocap="true" pos="0 -0.58 1.20">
+      <geom name="head_geom" type="ellipsoid" pos="0 0 0" size="0.085 0.095 0.11" material="mat_skin"/>
+      <geom name="eye_left" type="sphere" pos="-0.032 0.088 0" size="0.012"
+            contype="0" conaffinity="0" rgba="0.10 0.12 0.18 1"/>
+      <geom name="eye_right" type="sphere" pos="0.032 0.088 0" size="0.012"
+            contype="0" conaffinity="0" rgba="0.10 0.12 0.18 1"/>
+      <geom name="nose_geom" type="capsule" pos="0 0.095 -0.022" size="0.008 0.012"
+            contype="0" conaffinity="0" material="mat_skin"/>
+      <site name="eye_center" pos="0 0.094 0" size="0.012" rgba="0.92 0.20 0.20 1"/>
+      <geom name="neck_geom" type="cylinder" pos="0 0 -0.145" size="0.044 0.06"
+            contype="0" conaffinity="0" material="mat_skin"/>
+    </body>
+
+    <!-- 사용자 상체 (mocap #1: 골반 기준 회전, 충돌 활성) -->
+    <body name="user_torso" mocap="true" pos="0 -0.58 0.54">
+      <geom name="hip_geom" type="box" pos="0 0 0.02" size="0.16 0.09 0.06"
+            contype="0" conaffinity="0" material="mat_pants"/>
+      <geom name="torso_geom" type="box" pos="0 0 0.28" size="0.17 0.09 0.22" material="mat_shirt"/>
+      <geom name="arm_left_geom" type="capsule" fromto="-0.20 0.0 0.44 -0.20 0.06 0.16" size="0.042"
+            contype="0" conaffinity="0" material="mat_shirt"/>
+      <geom name="arm_right_geom" type="capsule" fromto="0.20 0.0 0.44 0.20 0.06 0.16" size="0.042"
+            contype="0" conaffinity="0" material="mat_shirt"/>
+    </body>
+
+    <!-- 사용자 허벅지 (mocap #2: 골반 기준) -->
+    <body name="user_thighs" mocap="true" pos="0 -0.58 0.50" quat="0.7071 0.7071 0 0">
+      <geom name="thigh_left" type="capsule" fromto="-0.095 0 0 -0.095 0 -0.41" size="0.058"
+            contype="0" conaffinity="0" material="mat_pants"/>
+      <geom name="thigh_right" type="capsule" fromto="0.095 0 0 0.095 0 -0.41" size="0.058"
+            contype="0" conaffinity="0" material="mat_pants"/>
+    </body>
+
+    <!-- 사용자 정강이·발 (mocap #3: 무릎 기준, 발바닥 z = 0 접지) -->
+    <body name="user_shins" mocap="true" pos="0 -0.17 0.49">
+      <geom name="shin_left" type="capsule" fromto="-0.095 0 0 -0.095 0 -0.43" size="0.046"
+            contype="0" conaffinity="0" material="mat_pants"/>
+      <geom name="shin_right" type="capsule" fromto="0.095 0 0 0.095 0 -0.43" size="0.046"
+            contype="0" conaffinity="0" material="mat_pants"/>
+      <geom name="shoe_left" type="box" pos="-0.095 0.05 -0.46" size="0.048 0.105 0.03"
+            contype="0" conaffinity="0" material="mat_shoe"/>
+      <geom name="shoe_right" type="box" pos="0.095 0.05 -0.46" size="0.048 0.105 0.03"
+            contype="0" conaffinity="0" material="mat_shoe"/>
+    </body>
+
+    <!-- 사무용 의자 하부·좌판 (mocap #4) -->
+    <body name="office_chair" mocap="true" pos="0 -0.58 0">
+      <geom name="chair_base" type="cylinder" pos="0 0 0.035" size="0.24 0.025"
+            contype="0" conaffinity="0" material="mat_metal"/>
+      <geom name="chair_stem" type="cylinder" pos="0 0 0.23" size="0.025 0.19"
+            contype="0" conaffinity="0" material="mat_metal"/>
+      <geom name="chair_seat" type="box" pos="0 0.02 0.435" size="0.23 0.22 0.025"
+            contype="0" conaffinity="0" material="mat_chair"/>
+    </body>
+
+    <!-- 사무용 의자 등받이 (mocap #5) -->
+    <body name="chair_backrest" mocap="true" pos="0 -0.78 0.45">
+      <geom name="chair_back" type="box" pos="0 0 0.27" size="0.22 0.024 0.26"
+            contype="0" conaffinity="0" material="mat_chair"/>
+    </body>
+  </worldbody>
+
+  <contact>
+    <exclude body1="arm_upper" body2="arm_forearm"/>
+    <exclude body1="arm_forearm" body2="monitor_mount"/>
+  </contact>
+
+  <actuator>
+    <position name="act_base_yaw" joint="base_yaw" kp="220" kv="30" ctrlrange="-2.60 2.60" forcerange="-45 45"/>
+    <position name="act_shoulder_pitch" joint="shoulder_pitch" kp="300" kv="40" ctrlrange="-1.50 1.50" forcerange="-60 60"/>
+    <position name="act_elbow_pitch" joint="elbow_pitch" kp="220" kv="30" ctrlrange="-2.70 2.70" forcerange="-45 45"/>
+    <position name="act_wrist_yaw" joint="wrist_yaw" kp="120" kv="18" ctrlrange="-3.1416 3.1416" forcerange="-20 20"/>
+    <position name="act_wrist_pitch" joint="wrist_pitch" kp="120" kv="18" ctrlrange="-3.1416 3.1416" forcerange="-20 20"/>
+    <position name="act_wrist_roll" joint="wrist_roll" kp="100" kv="15" ctrlrange="-3.1416 3.1416" forcerange="-20 20"/>
+  </actuator>
+
+  <sensor>
+    <jointpos name="base_yaw_pos" joint="base_yaw"/>
+    <jointvel name="base_yaw_vel" joint="base_yaw"/>
+    <actuatorfrc name="base_yaw_torque" actuator="act_base_yaw"/>
+    <jointpos name="shoulder_pitch_pos" joint="shoulder_pitch"/>
+    <jointvel name="shoulder_pitch_vel" joint="shoulder_pitch"/>
+    <actuatorfrc name="shoulder_pitch_torque" actuator="act_shoulder_pitch"/>
+    <jointpos name="elbow_pitch_pos" joint="elbow_pitch"/>
+    <jointvel name="elbow_pitch_vel" joint="elbow_pitch"/>
+    <actuatorfrc name="elbow_pitch_torque" actuator="act_elbow_pitch"/>
+    <jointpos name="wrist_yaw_pos" joint="wrist_yaw"/>
+    <jointvel name="wrist_yaw_vel" joint="wrist_yaw"/>
+    <jointpos name="wrist_pitch_pos" joint="wrist_pitch"/>
+    <jointvel name="wrist_pitch_vel" joint="wrist_pitch"/>
+    <jointpos name="wrist_roll_pos" joint="wrist_roll"/>
+    <jointvel name="wrist_roll_vel" joint="wrist_roll"/>
+    <framepos name="monitor_center_pos" objtype="site" objname="monitor_center"/>
+    <framepos name="monitor_top_pos" objtype="site" objname="monitor_top"/>
+    <framepos name="eye_center_pos" objtype="site" objname="eye_center"/>
+  </sensor>
+
+  <keyframe>
+    <!-- qpos 순서: base_yaw, shoulder_pitch, elbow_pitch, wrist_yaw, wrist_pitch, wrist_roll -->
+
+    <!-- 1. 똑바로 앉기 (화면 중심 y=0.10 m, 상단 1.20 m, 기울기 -11.5도, 가로형 0도) -->
+    <key name="seated"
+         qpos="-1.1501 0.2805 1.8475 1.9727 -0.2368 2.2193"
+         ctrl="-1.1501 0.2805 1.8475 1.9727 -0.2368 2.2193"
+         mpos="0 -0.58 1.20  0 -0.58 0.54  0 -0.58 0.50  0 -0.17 0.49  0 -0.58 0.00  0 -0.78 0.45"
+         mquat="1 0 0 0  1 0 0 0  0.7071 0.7071 0 0  1 0 0 0  1 0 0 0  1 0 0 0"/>
+
+    <!-- 2. 앞으로 숙이기 (화면 뒤로 물러남 y=0.19 m, 상단 1.15 m, 거리 유지) -->
+    <key name="lean_forward"
+         qpos="-1.3633 0.2967 1.9910 1.8719 -0.0082 2.3119"
+         ctrl="-1.3633 0.2967 1.9910 1.8719 -0.0082 2.3119"
+         mpos="0 -0.376 1.168  0 -0.58 0.54  0 -0.58 0.50  0 -0.17 0.49  0 -0.58 0.00  0 -0.78 0.45"
+         mquat="0.9962 -0.0872 0 0  0.9877 -0.1564 0 0  0.7071 0.7071 0 0  1 0 0 0  1 0 0 0  1 0 0 0"/>
+
+    <!-- 3. 의자에 기대 눕기 (팔이 앞으로 뻗고 내려오며 +5도 아래로 기울임) -->
+    <key name="reclined"
+         qpos="-0.6696 0.7806 1.1963 -1.2205 -2.2892 -1.0479"
+         ctrl="-0.6696 0.7806 1.1963 -1.2205 -2.2892 -1.0479"
+         mpos="0 -0.84 0.975  0 -0.47 0.46  0 -0.47 0.46  0 -0.06 0.49  0 -0.54 0.00  0 -0.62 0.45"
+         mquat="0.9925 0.1219 0 0  0.9455 0.3256 0 0  0.7071 0.7071 0 0  0.9945 0.1045 0 0  1 0 0 0  0.9455 0.3256 0 0"/>
+
+    <!-- 4. 서기 (어깨·팔꿈치 펴서 eye_z=1.56 m 도달, 발바닥 z=0 접지) -->
+    <key name="standing"
+         qpos="-1.1071 0.2701 0.8136 1.5371 -0.5010 1.1224"
+         ctrl="-1.1071 0.2701 0.8136 1.5371 -0.5010 1.1224"
+         mpos="0 -0.60 1.56  0 -0.60 0.90  0 -0.60 0.90  0 -0.60 0.49  -0.68 -0.86 0.00  -0.82 -1.00 0.45"
+         mquat="1 0 0 0  1 0 0 0  1 0 0 0  1 0 0 0  0.9239 0 0 -0.3827  0.9239 0 0 -0.3827"/>
+
+    <!-- 5. 세로형 피벗 (앉은 자세, 화면 90도 회전, 책상 여유 확보 위해 들어 올림) -->
+    <key name="portrait"
+         qpos="-1.1501 0.1914 1.7125 -1.3061 -2.7904 0.4059"
+         ctrl="-1.1501 0.1914 1.7125 -1.3061 -2.7904 0.4059"
+         mpos="0 -0.58 1.20  0 -0.58 0.54  0 -0.58 0.50  0 -0.17 0.49  0 -0.58 0.00  0 -0.78 0.45"
+         mquat="1 0 0 0  1 0 0 0  0.7071 0.7071 0 0  1 0 0 0  1 0 0 0  1 0 0 0"/>
+  </keyframe>
+</mujoco>
