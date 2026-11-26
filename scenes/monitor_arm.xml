@@ -1,0 +1,120 @@
+<mujoco model="monitor_arm_v0">
+  <compiler angle="radian" autolimits="true"/>
+  <option timestep="0.002" gravity="0 0 -9.81" integrator="implicitfast"/>
+
+  <visual>
+    <global offwidth="1600" offheight="1000" fovy="45"/>
+    <headlight diffuse="0.72 0.72 0.72" ambient="0.32 0.32 0.32" specular="0.15 0.15 0.15"/>
+    <rgba haze="0.93 0.95 0.97 1"/>
+  </visual>
+
+  <asset>
+    <texture name="tex_sky" type="skybox" builtin="gradient" width="512" height="512"
+             rgb1="0.93 0.95 0.98" rgb2="0.82 0.86 0.91"/>
+    <texture name="tex_floor" type="2d" builtin="checker" width="512" height="512"
+             rgb1="0.86 0.87 0.89" rgb2="0.78 0.80 0.83"/>
+    <material name="mat_floor" texture="tex_floor" texrepeat="6 6" reflectance="0.08"/>
+    <material name="mat_wood" rgba="0.72 0.56 0.40 1" specular="0.1" shininess="0.2"/>
+    <material name="mat_metal" rgba="0.24 0.26 0.30 1" specular="0.4" shininess="0.5"/>
+    <material name="mat_arm" rgba="0.18 0.20 0.24 1" specular="0.35" shininess="0.4"/>
+    <material name="mat_screen" rgba="0.11 0.16 0.24 1" specular="0.25" shininess="0.6"/>
+    <material name="mat_wall" rgba="0.90 0.91 0.93 1" specular="0.05"/>
+    <material name="mat_skin" rgba="0.87 0.75 0.65 1" specular="0.05"/>
+    <material name="mat_shirt" rgba="0.28 0.42 0.56 1" specular="0.05"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0.6 -1.4 2.4" dir="-0.2 0.5 -0.8" diffuse="0.75 0.75 0.75" castshadow="true"/>
+    <light pos="-1.2 -0.6 2.0" dir="0.5 0.2 -0.8" diffuse="0.35 0.35 0.35" castshadow="false"/>
+
+    <!-- 바닥 (z = 0) -->
+    <geom name="floor" type="plane" size="2.5 2.5 0.05" material="mat_floor"/>
+
+    <!-- 뒷벽 (책상 뒷면 y = 0.35 m 기준 8 cm 뒤, 끼임/충돌 기준 고정물) -->
+    <body name="wall" pos="0 0.44 1.0">
+      <geom name="wall_geom" type="box" size="1.10 0.01 1.00" material="mat_wall"/>
+    </body>
+
+    <!-- 일반 사무 책상 (1.20 x 0.70 x 0.72 m, 상판 윗면 z = 0.72 m) -->
+    <body name="desk" pos="0 0 0">
+      <geom name="desk_top" type="box" pos="0 0 0.705" size="0.60 0.35 0.015" material="mat_wood"/>
+      <geom name="desk_leg_fl" type="box" pos="-0.55 -0.30 0.345" size="0.02 0.02 0.345" material="mat_metal"/>
+      <geom name="desk_leg_fr" type="box" pos="0.55 -0.30 0.345" size="0.02 0.02 0.345" material="mat_metal"/>
+      <geom name="desk_leg_bl" type="box" pos="-0.55 0.30 0.345" size="0.02 0.02 0.345" material="mat_metal"/>
+      <geom name="desk_leg_br" type="box" pos="0.55 0.30 0.345" size="0.02 0.02 0.345" material="mat_metal"/>
+      <site name="desk_surface" pos="0 0 0.72" size="0.008" rgba="0.5 0.5 0.5 0.6"/>
+    </body>
+
+    <!-- 모니터암 고정 기둥 (책상 뒤쪽 중앙 클램프, z = 0.72 ~ 1.54 m) -->
+    <body name="arm_base" pos="0 0.31 0.72">
+      <geom name="arm_clamp" type="box" pos="0 0 0.015" size="0.05 0.04 0.015"
+            contype="0" conaffinity="0" material="mat_arm"/>
+      <geom name="arm_pole" type="cylinder" pos="0 0 0.41" size="0.022 0.41"
+            contype="0" conaffinity="0" material="mat_metal"/>
+
+      <!-- 높이 조절 캐리지 (q_lift = 0일 때 세계 z = 0.95 m, 스트로크 0.50 m -> z = 0.95 ~ 1.45 m) -->
+      <body name="arm_carriage" pos="0 0 0.23" gravcomp="1">
+        <joint name="arm_lift" type="slide" axis="0 0 1" range="0.0 0.50" damping="15"/>
+        <geom name="arm_collar" type="cylinder" pos="0 0 0" size="0.034 0.04"
+              contype="0" conaffinity="0" mass="0.6" material="mat_arm"/>
+        <geom name="arm_link" type="box" pos="0 -0.118 0" size="0.022 0.093 0.022" mass="0.6" material="mat_arm"/>
+
+        <!-- 기울기 축 + 27인치 모니터 (0.61 x 0.03 x 0.36 m, 4.5 kg) -->
+        <body name="monitor_mount" pos="0 -0.22 0" gravcomp="1">
+          <joint name="arm_tilt" type="hinge" axis="1 0 0" range="-0.26 0.26" damping="2.0"/>
+          <geom name="vesa_plate" type="box" pos="0 0 0" size="0.055 0.01 0.055" mass="0.3" material="mat_metal"/>
+          <geom name="monitor_panel" type="box" pos="0 -0.025 0" size="0.305 0.015 0.18" mass="4.5" material="mat_arm"/>
+          <geom name="monitor_screen" type="box" pos="0 -0.0405 0" size="0.293 0.001 0.168"
+                contype="0" conaffinity="0" mass="0.0" material="mat_screen"/>
+          <site name="monitor_top" pos="0 -0.042 0.18" size="0.012" rgba="0.12 0.78 0.36 1"/>
+          <site name="monitor_bottom" pos="0 -0.042 -0.18" size="0.010" rgba="0.95 0.62 0.12 1"/>
+
+          <!-- 모니터 상단 웹캠 (광각 세로 시야 75도 가정, 사용자 쪽 -y 방향) -->
+          <body name="webcam_unit" pos="0 -0.025 0.195" gravcomp="1">
+            <geom name="webcam_body" type="box" pos="0 0 0" size="0.04 0.015 0.015" mass="0.1" material="mat_metal"/>
+            <geom name="webcam_lens_geom" type="cylinder" pos="0 -0.016 0" euler="1.5708 0 0"
+                  size="0.008 0.004" contype="0" conaffinity="0" mass="0.0" rgba="0.08 0.22 0.38 1"/>
+            <camera name="webcam" pos="0 -0.022 0" xyaxes="-1 0 0 0 0 1" fovy="75"/>
+            <site name="webcam_lens" pos="0 -0.021 0" size="0.006" rgba="0.20 0.62 0.98 1"/>
+          </body>
+        </body>
+      </body>
+    </body>
+
+    <!-- 사용자 머리·상체 대역 (기본값: 앉은 눈높이 z = 1.18 m, 화면 앞 약 0.56 m) -->
+    <body name="user_head" mocap="true" pos="0 -0.60 1.18">
+      <geom name="head_geom" type="ellipsoid" pos="0 0 0" size="0.085 0.095 0.11" material="mat_skin"/>
+      <geom name="eye_left" type="sphere" pos="-0.032 0.088 0" size="0.012"
+            contype="0" conaffinity="0" rgba="0.10 0.12 0.18 1"/>
+      <geom name="eye_right" type="sphere" pos="0.032 0.088 0" size="0.012"
+            contype="0" conaffinity="0" rgba="0.10 0.12 0.18 1"/>
+      <geom name="nose_geom" type="capsule" pos="0 0.095 -0.022" size="0.008 0.012"
+            contype="0" conaffinity="0" material="mat_skin"/>
+      <site name="eye_center" pos="0 0.094 0" size="0.012" rgba="0.92 0.20 0.20 1"/>
+      <geom name="neck_geom" type="cylinder" pos="0 0 -0.14" size="0.045 0.04"
+            contype="0" conaffinity="0" material="mat_skin"/>
+      <geom name="torso_geom" type="box" pos="0 -0.01 -0.34" size="0.17 0.09 0.17"
+            contype="0" conaffinity="0" material="mat_shirt"/>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <position name="act_lift" joint="arm_lift" kp="1500" kv="120" ctrlrange="0.0 0.50" forcerange="-80 80"/>
+    <position name="act_tilt" joint="arm_tilt" kp="60" kv="10" ctrlrange="-0.26 0.26" forcerange="-15 15"/>
+  </actuator>
+
+  <sensor>
+    <jointpos name="arm_lift_pos" joint="arm_lift"/>
+    <jointvel name="arm_lift_vel" joint="arm_lift"/>
+    <actuatorfrc name="arm_lift_force" actuator="act_lift"/>
+    <jointpos name="arm_tilt_pos" joint="arm_tilt"/>
+    <jointvel name="arm_tilt_vel" joint="arm_tilt"/>
+    <framepos name="monitor_top_pos" objtype="site" objname="monitor_top"/>
+    <framepos name="eye_center_pos" objtype="site" objname="eye_center"/>
+  </sensor>
+
+  <keyframe>
+    <key name="seated" qpos="0.05 0.0" ctrl="0.05 0.0" mpos="0 -0.60 1.18" mquat="1 0 0 0"/>
+    <key name="standing" qpos="0.43 0.0" ctrl="0.43 0.0" mpos="0 -0.60 1.56" mquat="1 0 0 0"/>
+  </keyframe>
+</mujoco>
