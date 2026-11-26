@@ -1,4 +1,4 @@
-"""D07 장면 구성표 확인 코드 (scenes/monitor_arm.xml, 6축 SCARA + 손목).
+"""D07 장면 구성표 확인 코드 (scenes/monitor_arm.xml, 수직 다관절 6축 RRRRRR).
 
 실행 예:
     uv run python scripts/check_scene.py
@@ -30,6 +30,22 @@ def monitor_extents(m: mujoco.MjModel, d: mujoco.MjData) -> tuple[float, float, 
     return float(world_pts[:, 2].min()), float(world_pts[:, 2].max()), float(world_pts[:, 1].max())
 
 
+def arm_max_y(m: mujoco.MjModel, d: mujoco.MjData) -> float:
+    """모니터 패널과 팔꿈치·상부 링크 중 뒷벽 쪽 최후방 y를 계산한다."""
+    _, _, mon_max_y = monitor_extents(m, d)
+    elbow_y = float(d.xpos[m.body("arm_forearm").id][1]) + 0.032
+    return max(mon_max_y, elbow_y)
+
+
+def monitor_world_roll_deg(m: mujoco.MjModel, d: mujoco.MjData) -> float:
+    """화면 로컬 +Z축이 월드 수평면에서 얼마나 회전했는지(가로 0도, 세로 90도) 계산한다."""
+    site_mat = d.site_xmat[m.site("monitor_center").id].reshape(3, 3)
+    local_z = site_mat[:, 2]
+    # 화면 정면이 -Y를 향할 때 로컬 +Z의 X·Z 성분으로 롤 각도 계산
+    deg = abs(math.degrees(math.atan2(float(local_z[0]), float(local_z[2]))))
+    return 0.0 if deg < 0.5 else deg
+
+
 def target_ref_z(
     m: mujoco.MjModel,
     d: mujoco.MjData,
@@ -37,15 +53,9 @@ def target_ref_z(
     eye: np.ndarray,
     is_portrait: bool,
 ) -> tuple[float, float, str]:
-    """R-02 기준 높이와 실제 측정 높이를 반환한다.
-
-    - 가로형(똑바로 앉기·앞으로 숙이기·서기): 화면 상단 모서리 vs 수평 눈높이(eye_z)
-    - 가로형(기대 눕기, 머리 상향): 화면 상단 모서리 vs 머리 정면 시선선이 화면에 닿는 높이
-    - 세로형(portrait, 높이 61 cm): 책상 여유(50 mm 이상)를 지킨 상태에서 상단 1/3 읽기선 vs 눈높이
-    """
+    """R-02 기준 높이와 실제 측정 높이를 반환한다."""
     _, max_z, _ = monitor_extents(m, d)
     if is_portrait:
-        # 세로 0.61 m 기준 상단에서 1/3 아래 지점 (max_z - 0.61 / 3)
         read_line_z = max_z - (0.61 / 3.0)
         return float(eye[2]), read_line_z, "상단1/3"
 
@@ -75,8 +85,8 @@ def check_pose(m: mujoco.MjModel, key_name: str) -> bool:
     center = d.site_xpos[m.site("monitor_center").id].copy()
     desk_z = float(d.site_xpos[m.site("desk_surface").id][2])
     wall_y = float(d.site_xpos[m.site("wall_front").id][1])
-    roll_rad = float(d.qpos[m.jnt_qposadr[m.joint("wrist_roll").id]])
-    is_portrait = abs(roll_rad) > 0.7
+    roll_deg = monitor_world_roll_deg(m, d)
+    is_portrait = roll_deg > 45.0
 
     # R-01: 눈-화면 중심 거리
     dist_m = float(np.linalg.norm(eye - center))
@@ -93,10 +103,10 @@ def check_pose(m: mujoco.MjModel, key_name: str) -> bool:
     cos_ang = float(np.clip(np.dot(screen_normal, to_eye), -1.0, 1.0))
     angle_deg = math.degrees(math.acos(cos_ang))
 
-    # R-10: 실제 8개 꼭짓점 기준 책상·뒷벽 여유 및 SCARA 링크 포함 전체 접촉
-    min_z, _, max_y = monitor_extents(m, d)
+    # R-10: 모니터 8개 꼭짓점·팔꿈치 기준 책상·뒷벽 여유 및 전체 접촉
+    min_z, _, _ = monitor_extents(m, d)
     desk_clear_mm = (min_z - desk_z) * 1000.0
-    wall_clear_mm = (wall_y - max_y) * 1000.0
+    wall_clear_mm = (wall_y - arm_max_y(m, d)) * 1000.0
 
     ok = (
         DIST_MIN_M <= dist_m <= DIST_MAX_M
@@ -107,9 +117,6 @@ def check_pose(m: mujoco.MjModel, key_name: str) -> bool:
         and d.ncon == 0
     )
     status = "PASS" if ok else "FAIL"
-    roll_deg = math.degrees(roll_rad)
-    if abs(roll_deg) < 0.5:
-        roll_deg = 0.0
     print(
         f"[{key_name:12s}] {status} | 거리 {dist_m:.3f} m (R-01) | "
         f"{ref_label} {meas_z:.3f}/목표 {target_z:.3f} m (오차 {height_err_mm:.1f} mm, R-02) | "
@@ -122,7 +129,7 @@ def check_pose(m: mujoco.MjModel, key_name: str) -> bool:
 def main() -> None:
     m = mujoco.MjModel.from_xml_path(str(SCENE))
     moving = [
-        "arm_carriage",
+        "arm_turret",
         "arm_upper",
         "arm_forearm",
         "wrist_yaw_body",

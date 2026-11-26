@@ -1,4 +1,4 @@
-<mujoco model="monitor_arm_scara_6dof">
+<mujoco model="monitor_arm_articulated_6dof">
   <compiler angle="radian" autolimits="true"/>
   <option timestep="0.002" gravity="0 0 -9.81" integrator="implicitfast"/>
 
@@ -15,9 +15,9 @@
              rgb1="0.86 0.87 0.89" rgb2="0.78 0.80 0.83"/>
     <material name="mat_floor" texture="tex_floor" texrepeat="6 6" reflectance="0.08"/>
     <material name="mat_wood" rgba="0.73 0.57 0.41 1" specular="0.1" shininess="0.2"/>
-    <material name="mat_metal" rgba="0.27 0.29 0.33 1" specular="0.4" shininess="0.5"/>
+    <material name="mat_metal" rgba="0.28 0.31 0.36 1" specular="0.4" shininess="0.5"/>
     <material name="mat_arm" rgba="0.18 0.20 0.25 1" specular="0.35" shininess="0.4"/>
-    <material name="mat_joint" rgba="0.36 0.40 0.46 1" specular="0.45" shininess="0.5"/>
+    <material name="mat_joint" rgba="0.42 0.46 0.53 1" specular="0.45" shininess="0.5"/>
     <material name="mat_screen" rgba="0.11 0.16 0.24 1" specular="0.25" shininess="0.6"/>
     <material name="mat_wall" rgba="0.90 0.91 0.93 1" specular="0.05"/>
     <material name="mat_chair" rgba="0.22 0.24 0.28 1" specular="0.1"/>
@@ -50,54 +50,50 @@
       <site name="desk_surface" pos="0 0 0.72" size="0.008" rgba="0.5 0.5 0.5 0.6"/>
     </body>
 
-    <!-- 6축 SCARA + 손목 모니터암 고정 기둥 (책상 뒤쪽 중앙 클램프 y = 0.34 m, z = 0.72 ~ 1.67 m) -->
-    <body name="arm_base" pos="0 0.34 0.72">
-      <geom name="arm_clamp" type="box" pos="0 0 0.015" size="0.05 0.035 0.015"
+    <!-- 수직 다관절 6축(RRRRRR) 모니터암 C-클램프 베이스 (책상 우측 뒤쪽 x = 0.38, y = 0.32, z = 0.72 m) -->
+    <body name="arm_base" pos="0.38 0.32 0.72">
+      <geom name="arm_clamp" type="box" pos="0 0.03 0.015" size="0.06 0.065 0.015"
             contype="0" conaffinity="0" material="mat_arm"/>
-      <geom name="arm_pole" type="cylinder" pos="0 0 0.475" size="0.022 0.475"
+      <geom name="base_pedestal" type="cylinder" pos="0 0 0.045" size="0.048 0.03"
             contype="0" conaffinity="0" material="mat_metal"/>
 
-      <!-- 1축: 수직 승강 (arm_lift, q = 0일 때 z = 0.90 m, 스트로크 0.58 m -> z = 0.90 ~ 1.48 m) -->
-      <body name="arm_carriage" pos="0 0 0.18" gravcomp="1">
-        <joint name="arm_lift" type="slide" axis="0 0 1" range="0.0 0.58" damping="20"/>
-        <geom name="arm_collar" type="cylinder" pos="0 0 0" size="0.034 0.042"
-              contype="0" conaffinity="0" mass="0.6" material="mat_arm"/>
+      <!-- 1축: 베이스 수직축 회전 (base_yaw) -->
+      <body name="arm_turret" pos="0 0 0.10" gravcomp="1">
+        <joint name="base_yaw" type="hinge" axis="0 0 1" range="-2.60 2.60" damping="3.0"/>
+        <geom name="turret_geom" type="cylinder" pos="0 0 -0.01" size="0.040 0.035"
+              contype="0" conaffinity="0" mass="0.6" material="mat_joint"/>
 
-        <!-- 2축: SCARA 1링크 수평 회전 (arm_shoulder_yaw, 링크 길이 L1 = 0.28 m) -->
+        <!-- 2축: 어깨 수평축 상하 꺾임 (shoulder_pitch, 하부 링크 L1 = 0.40 m) -->
         <body name="arm_upper" pos="0 0 0" gravcomp="1">
-          <joint name="arm_shoulder_yaw" type="hinge" axis="0 0 1" range="-2.40 2.40" damping="3.0"/>
-          <geom name="shoulder_hub" type="cylinder" pos="0 0 0" size="0.030 0.024"
-                contype="0" conaffinity="0" mass="0.2" material="mat_joint"/>
-          <geom name="upper_link" type="box" pos="0 -0.14 0" size="0.020 0.14 0.016"
-                mass="0.5" material="mat_arm"/>
-          <geom name="elbow_shaft" type="cylinder" pos="0 -0.28 0.022" size="0.020 0.024"
-                contype="0" conaffinity="0" mass="0.1" material="mat_joint"/>
+          <joint name="shoulder_pitch" type="hinge" axis="1 0 0" range="-1.50 1.50" damping="4.0"/>
+          <geom name="shoulder_hub" type="cylinder" pos="0 0 0" euler="0 1.5708 0"
+                size="0.036 0.036" contype="0" conaffinity="0" mass="0.3" material="mat_joint"/>
+          <geom name="upper_link" type="capsule" fromto="0 0 0.03 0 0 0.37" size="0.028"
+                mass="0.7" material="mat_arm"/>
 
-          <!-- 3축: SCARA 2링크 수평 회전 (arm_elbow_yaw, 링크 길이 L2 = 0.28 m, 1링크 위 4.4 cm 단차) -->
-          <body name="arm_forearm" pos="0 -0.28 0.044" gravcomp="1">
-            <joint name="arm_elbow_yaw" type="hinge" axis="0 0 1" range="-2.95 2.95" damping="2.5"/>
-            <geom name="elbow_hub" type="cylinder" pos="0 0 0" size="0.026 0.020"
-                  contype="0" conaffinity="0" mass="0.2" material="mat_joint"/>
-            <geom name="forearm_link" type="box" pos="0 -0.14 0" size="0.018 0.14 0.014"
-                  mass="0.4" material="mat_metal"/>
-            <geom name="wrist_drop_shaft" type="cylinder" pos="0 -0.28 -0.022" size="0.018 0.024"
-                  contype="0" conaffinity="0" mass="0.1" material="mat_joint"/>
+          <!-- 3축: 팔꿈치 수평축 상하 꺾임 (elbow_pitch, 상부 링크 L2 = 0.36 m, 총 도달 0.76 m) -->
+          <body name="arm_forearm" pos="0 0 0.40" gravcomp="1">
+            <joint name="elbow_pitch" type="hinge" axis="1 0 0" range="-2.70 2.70" damping="3.5"/>
+            <geom name="elbow_hub" type="cylinder" pos="0 0 0" euler="0 1.5708 0"
+                  size="0.032 0.032" contype="0" conaffinity="0" mass="0.25" material="mat_joint"/>
+            <geom name="forearm_link" type="capsule" fromto="0 0 0.03 0 0 0.33" size="0.023"
+                  mass="0.55" material="mat_metal"/>
 
-            <!-- 4축: 손목 좌우 방향 (wrist_yaw, ±140도) -->
-            <body name="wrist_yaw_body" pos="0 -0.28 -0.044" gravcomp="1">
-              <joint name="wrist_yaw" type="hinge" axis="0 0 1" range="-2.45 2.45" damping="2.0"/>
-              <geom name="wrist_yaw_hub" type="cylinder" pos="0 0 0" size="0.022 0.020"
-                    contype="0" conaffinity="0" mass="0.2" material="mat_arm"/>
+            <!-- 4축: 손목 좌우 회전 (wrist_yaw) -->
+            <body name="wrist_yaw_body" pos="0 0 0.36" gravcomp="1">
+              <joint name="wrist_yaw" type="hinge" axis="0 0 1" range="-3.1416 3.1416" damping="2.5"/>
+              <geom name="wrist_yaw_hub" type="cylinder" pos="0 0 0" size="0.024 0.024"
+                    contype="0" conaffinity="0" mass="0.2" material="mat_joint"/>
 
-              <!-- 5축: 손목 상하 기울기 (wrist_pitch, ±26도) -->
+              <!-- 5축: 손목 상하 기울기 (wrist_pitch) -->
               <body name="wrist_pitch_body" pos="0 0 0" gravcomp="1">
-                <joint name="wrist_pitch" type="hinge" axis="1 0 0" range="-0.45 0.45" damping="2.5"/>
-                <geom name="wrist_pitch_hub" type="cylinder" pos="0 -0.008 0" euler="0 1.5708 0"
-                      size="0.016 0.022" contype="0" conaffinity="0" mass="0.2" material="mat_joint"/>
+                <joint name="wrist_pitch" type="hinge" axis="1 0 0" range="-3.1416 3.1416" damping="2.5"/>
+                <geom name="wrist_pitch_hub" type="cylinder" pos="0 0 0" euler="0 1.5708 0"
+                      size="0.020 0.024" contype="0" conaffinity="0" mass="0.2" material="mat_arm"/>
 
-                <!-- 6축: 손목 가로/세로 피벗 (wrist_roll, 0~90도, ±90도 허용) + 27인치 모니터 -->
+                <!-- 6축: 손목 가로·세로 피벗 (wrist_roll) + 27인치 모니터 (0.61 x 0.03 x 0.36 m, 4.5 kg) -->
                 <body name="monitor_mount" pos="0 0 0" gravcomp="1">
-                  <joint name="wrist_roll" type="hinge" axis="0 1 0" range="-1.5708 1.5708" damping="2.5"/>
+                  <joint name="wrist_roll" type="hinge" axis="0 1 0" range="-3.1416 3.1416" damping="2.5"/>
                   <geom name="vesa_plate" type="box" pos="0 -0.012 0" size="0.055 0.008 0.055"
                         contype="0" conaffinity="0" mass="0.3" material="mat_metal"/>
                   <geom name="monitor_panel" type="box" pos="0 -0.032 0" size="0.305 0.015 0.18"
@@ -195,22 +191,24 @@
   </contact>
 
   <actuator>
-    <position name="act_lift" joint="arm_lift" kp="2000" kv="160" ctrlrange="0.0 0.58" forcerange="-80 80"/>
-    <position name="act_shoulder_yaw" joint="arm_shoulder_yaw" kp="180" kv="25" ctrlrange="-2.40 2.40" forcerange="-40 40"/>
-    <position name="act_elbow_yaw" joint="arm_elbow_yaw" kp="140" kv="20" ctrlrange="-2.95 2.95" forcerange="-35 35"/>
-    <position name="act_wrist_yaw" joint="wrist_yaw" kp="100" kv="15" ctrlrange="-2.45 2.45" forcerange="-20 20"/>
-    <position name="act_wrist_pitch" joint="wrist_pitch" kp="90" kv="14" ctrlrange="-0.45 0.45" forcerange="-20 20"/>
-    <position name="act_wrist_roll" joint="wrist_roll" kp="90" kv="14" ctrlrange="-1.5708 1.5708" forcerange="-20 20"/>
+    <position name="act_base_yaw" joint="base_yaw" kp="220" kv="30" ctrlrange="-2.60 2.60" forcerange="-45 45"/>
+    <position name="act_shoulder_pitch" joint="shoulder_pitch" kp="300" kv="40" ctrlrange="-1.50 1.50" forcerange="-60 60"/>
+    <position name="act_elbow_pitch" joint="elbow_pitch" kp="220" kv="30" ctrlrange="-2.70 2.70" forcerange="-45 45"/>
+    <position name="act_wrist_yaw" joint="wrist_yaw" kp="120" kv="18" ctrlrange="-3.1416 3.1416" forcerange="-20 20"/>
+    <position name="act_wrist_pitch" joint="wrist_pitch" kp="120" kv="18" ctrlrange="-3.1416 3.1416" forcerange="-20 20"/>
+    <position name="act_wrist_roll" joint="wrist_roll" kp="100" kv="15" ctrlrange="-3.1416 3.1416" forcerange="-20 20"/>
   </actuator>
 
   <sensor>
-    <jointpos name="arm_lift_pos" joint="arm_lift"/>
-    <jointvel name="arm_lift_vel" joint="arm_lift"/>
-    <actuatorfrc name="arm_lift_force" actuator="act_lift"/>
-    <jointpos name="arm_shoulder_yaw_pos" joint="arm_shoulder_yaw"/>
-    <jointvel name="arm_shoulder_yaw_vel" joint="arm_shoulder_yaw"/>
-    <jointpos name="arm_elbow_yaw_pos" joint="arm_elbow_yaw"/>
-    <jointvel name="arm_elbow_yaw_vel" joint="arm_elbow_yaw"/>
+    <jointpos name="base_yaw_pos" joint="base_yaw"/>
+    <jointvel name="base_yaw_vel" joint="base_yaw"/>
+    <actuatorfrc name="base_yaw_torque" actuator="act_base_yaw"/>
+    <jointpos name="shoulder_pitch_pos" joint="shoulder_pitch"/>
+    <jointvel name="shoulder_pitch_vel" joint="shoulder_pitch"/>
+    <actuatorfrc name="shoulder_pitch_torque" actuator="act_shoulder_pitch"/>
+    <jointpos name="elbow_pitch_pos" joint="elbow_pitch"/>
+    <jointvel name="elbow_pitch_vel" joint="elbow_pitch"/>
+    <actuatorfrc name="elbow_pitch_torque" actuator="act_elbow_pitch"/>
     <jointpos name="wrist_yaw_pos" joint="wrist_yaw"/>
     <jointvel name="wrist_yaw_vel" joint="wrist_yaw"/>
     <jointpos name="wrist_pitch_pos" joint="wrist_pitch"/>
@@ -223,40 +221,40 @@
   </sensor>
 
   <keyframe>
-    <!-- qpos 순서: arm_lift, arm_shoulder_yaw, arm_elbow_yaw, wrist_yaw, wrist_pitch, wrist_roll -->
+    <!-- qpos 순서: base_yaw, shoulder_pitch, elbow_pitch, wrist_yaw, wrist_pitch, wrist_roll -->
 
-    <!-- 1. 똑바로 앉기 (y_w=0.15 m, alpha=1.2246 rad, tilt=-11.5도, roll=0) -->
+    <!-- 1. 똑바로 앉기 (화면 중심 y=0.10 m, 상단 1.20 m, 기울기 -11.5도, 가로형 0도) -->
     <key name="seated"
-         qpos="0.114 1.2246 -2.4492 1.2246 -0.20 0.0"
-         ctrl="0.114 1.2246 -2.4492 1.2246 -0.20 0.0"
+         qpos="-1.1501 0.2805 1.8475 1.9727 -0.2368 2.2193"
+         ctrl="-1.1501 0.2805 1.8475 1.9727 -0.2368 2.2193"
          mpos="0 -0.58 1.20  0 -0.58 0.54  0 -0.58 0.50  0 -0.17 0.49  0 -0.58 0.00  0 -0.78 0.45"
          mquat="1 0 0 0  1 0 0 0  0.7071 0.7071 0 0  1 0 0 0  1 0 0 0  1 0 0 0"/>
 
-    <!-- 2. 앞으로 숙이기 (y_w=0.25 m, SCARA 접힘 alpha=1.4094 rad, 거리 유지) -->
+    <!-- 2. 앞으로 숙이기 (화면 뒤로 물러남 y=0.19 m, 상단 1.15 m, 거리 유지) -->
     <key name="lean_forward"
-         qpos="0.066 1.4094 -2.8188 1.4094 -0.22 0.0"
-         ctrl="0.066 1.4094 -2.8188 1.4094 -0.22 0.0"
+         qpos="-1.3633 0.2967 1.9910 1.8719 -0.0082 2.3119"
+         ctrl="-1.3633 0.2967 1.9910 1.8719 -0.0082 2.3119"
          mpos="0 -0.376 1.168  0 -0.58 0.54  0 -0.58 0.50  0 -0.17 0.49  0 -0.58 0.00  0 -0.78 0.45"
          mquat="0.9962 -0.0872 0 0  0.9877 -0.1564 0 0  0.7071 0.7071 0 0  1 0 0 0  1 0 0 0  1 0 0 0"/>
 
-    <!-- 3. 의자에 기대 눕기 (y_w=-0.16 m, SCARA 뻗음 alpha=0.4664 rad, 내려오고 +5도 기울임) -->
+    <!-- 3. 의자에 기대 눕기 (팔이 앞으로 뻗고 내려오며 +5도 아래로 기울임) -->
     <key name="reclined"
-         qpos="0.062 0.4664 -0.9328 0.4664 0.09 0.0"
-         ctrl="0.062 0.4664 -0.9328 0.4664 0.09 0.0"
+         qpos="-0.6696 0.7806 1.1963 -1.2205 -2.2892 -1.0479"
+         ctrl="-0.6696 0.7806 1.1963 -1.2205 -2.2892 -1.0479"
          mpos="0 -0.84 0.975  0 -0.47 0.46  0 -0.47 0.46  0 -0.06 0.49  0 -0.54 0.00  0 -0.62 0.45"
          mquat="0.9925 0.1219 0 0  0.9455 0.3256 0 0  0.7071 0.7071 0 0  0.9945 0.1045 0 0  1 0 0 0  0.9455 0.3256 0 0"/>
 
-    <!-- 4. 서기 (y_w=0.13 m, alpha=1.1864 rad, eye_z=1.56 m, 발바닥 z=0 접지) -->
+    <!-- 4. 서기 (어깨·팔꿈치 펴서 eye_z=1.56 m 도달, 발바닥 z=0 접지) -->
     <key name="standing"
-         qpos="0.474 1.1864 -2.3728 1.1864 -0.20 0.0"
-         ctrl="0.474 1.1864 -2.3728 1.1864 -0.20 0.0"
+         qpos="-1.1071 0.2701 0.8136 1.5371 -0.5010 1.1224"
+         ctrl="-1.1071 0.2701 0.8136 1.5371 -0.5010 1.1224"
          mpos="0 -0.60 1.56  0 -0.60 0.90  0 -0.60 0.90  0 -0.60 0.49  -0.68 -0.86 0.00  -0.82 -1.00 0.45"
          mquat="1 0 0 0  1 0 0 0  1 0 0 0  1 0 0 0  0.9239 0 0 -0.3827  0.9239 0 0 -0.3827"/>
 
-    <!-- 5. 세로형 피벗 (앉은 자세, wrist_roll=90도, 책상 여유 확보 위해 arm_lift 상승) -->
+    <!-- 5. 세로형 피벗 (앉은 자세, 화면 90도 회전, 책상 여유 확보 위해 들어 올림) -->
     <key name="portrait"
-         qpos="0.195 1.2246 -2.4492 1.2246 -0.12 1.5708"
-         ctrl="0.195 1.2246 -2.4492 1.2246 -0.12 1.5708"
+         qpos="-1.1501 0.1914 1.7125 -1.3061 -2.7904 0.4059"
+         ctrl="-1.1501 0.1914 1.7125 -1.3061 -2.7904 0.4059"
          mpos="0 -0.58 1.20  0 -0.58 0.54  0 -0.58 0.50  0 -0.17 0.49  0 -0.58 0.00  0 -0.78 0.45"
          mquat="1 0 0 0  1 0 0 0  0.7071 0.7071 0 0  1 0 0 0  1 0 0 0  1 0 0 0"/>
   </keyframe>

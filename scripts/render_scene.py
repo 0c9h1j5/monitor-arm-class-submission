@@ -1,4 +1,4 @@
-"""D07 장면 v2(6축 SCARA) 5자세 스크린샷 렌더 스크립트.
+"""D07 장면 v3(수직 다관절 6축 RRRRRR) 5자세 스크린샷 렌더 스크립트.
 
 실행 예:
     uv run --with pillow python scripts/render_scene.py
@@ -55,20 +55,25 @@ def render_pose(m: mujoco.MjModel, key_name: str, label: str, out_name: str) -> 
     eye = d.site_xpos[m.site("eye_center").id].copy()
     center = d.site_xpos[m.site("monitor_center").id].copy()
     dist_cm = float(np.linalg.norm(eye - center)) * 100.0
-    pitch_deg = math.degrees(float(d.qpos[m.jnt_qposadr[m.joint("wrist_pitch").id]]))
-    roll_deg = math.degrees(float(d.qpos[m.jnt_qposadr[m.joint("wrist_roll").id]]))
-    if abs(roll_deg) < 0.5:
+
+    # 화면 월드 기울기(정면 법선의 수평 기준 각도)와 롤(가로 0도 / 세로 90도)
+    site_mat = d.site_xmat[m.site("monitor_center").id].reshape(3, 3)
+    normal = -site_mat[:, 1]
+    pitch_deg = -math.degrees(math.asin(float(np.clip(normal[2], -1.0, 1.0))))
+    local_z = site_mat[:, 2]
+    roll_deg = abs(math.degrees(math.atan2(float(local_z[0]), float(local_z[2]))))
+    if roll_deg < 0.5:
         roll_deg = 0.0
-    is_portrait = abs(roll_deg) > 45.0
+    is_portrait = roll_deg > 45.0
 
     opt = mujoco.MjvOption()
     opt.sitegroup[:] = 1
     opt.frame = mujoco.mjtFrame.mjFRAME_NONE
 
-    # 왼쪽: 3D 측면 대각선 시점 (SCARA 2링크 + 전신·의자·책상·모니터가 보이게)
+    # 왼쪽: 3D 측면 대각선 시점 (우측 뒤쪽 베이스 + 수직 다관절 6축 링크가 잘 보이게)
     w_main, h_main = 1040, 720
     r_main = mujoco.Renderer(m, h_main, w_main)
-    r_main.update_scene(d, free_cam([0.05, -0.20, 0.90], 2.58, 160, -14), opt)
+    r_main.update_scene(d, free_cam([0.06, -0.18, 0.90], 2.58, 154, -15), opt)
     im_main = Image.fromarray(r_main.render())
     r_main.close()
 
