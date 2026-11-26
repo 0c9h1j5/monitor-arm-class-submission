@@ -1,9 +1,11 @@
-"""D07 장면 v0 앉기·서기 스크린샷 렌더 스크립트.
+"""D07 장면 v1 4자세 스크린샷 렌더 스크립트.
 
 실행 예:
     uv run --with pillow python scripts/render_scene.py
 """
 from pathlib import Path
+import math
+import numpy as np
 import mujoco
 from PIL import Image, ImageDraw, ImageFont
 
@@ -50,22 +52,25 @@ def render_pose(m: mujoco.MjModel, key_name: str, label: str, out_name: str) -> 
     for _ in range(200):
         mujoco.mj_step(m, d)
 
-    eye_z = float(d.site_xpos[m.site("eye_center").id][2])
-    top_z = float(d.site_xpos[m.site("monitor_top").id][2])
+    eye = d.site_xpos[m.site("eye_center").id].copy()
+    center = d.site_xpos[m.site("monitor_center").id].copy()
+    top = d.site_xpos[m.site("monitor_top").id].copy()
+    dist_cm = float(np.linalg.norm(eye - center)) * 100.0
+    tilt_deg = math.degrees(float(d.qpos[m.jnt_qposadr[m.joint("arm_tilt").id]]))
 
     opt = mujoco.MjvOption()
     opt.sitegroup[:] = 1
     opt.frame = mujoco.mjtFrame.mjFRAME_NONE
 
-    # 왼쪽: 3D 측면 대각선 시점 (책상·암·모니터·사람 머리·눈 표시)
-    w_main, h_main = 1000, 720
+    # 왼쪽: 3D 측면 대각선 시점 (전신·의자·책상·암·모니터가 한눈에 보이게)
+    w_main, h_main = 1040, 720
     r_main = mujoco.Renderer(m, h_main, w_main)
-    r_main.update_scene(d, free_cam([0.0, -0.12, 1.02], 2.25, 168, -12), opt)
+    r_main.update_scene(d, free_cam([0.0, -0.22, 0.88], 2.55, 168, -11), opt)
     im_main = Image.fromarray(r_main.render())
     r_main.close()
 
-    # 오른쪽: 모니터 상단 웹캠 시점 (눈이 화각 안에 들어오는지 확인)
-    w_cam, h_cam = 600, 720
+    # 오른쪽: 모니터 상단 웹캠 시점
+    w_cam, h_cam = 560, 720
     r_cam = mujoco.Renderer(m, h_cam, w_cam)
     r_cam.update_scene(d, "webcam", opt)
     im_cam = Image.fromarray(r_cam.render())
@@ -77,19 +82,19 @@ def render_pose(m: mujoco.MjModel, key_name: str, label: str, out_name: str) -> 
 
     dr = ImageDraw.Draw(canvas, "RGBA")
     dr.line([(w_main, 0), (w_main, h_main)], fill=(210, 214, 220, 255), width=3)
-    f_title = load_font(22)
-    f_sub = load_font(18)
+    f_title = load_font(21)
+    f_sub = load_font(17)
 
     draw_tag(
         dr,
         (18, 16),
-        f"{label} — 눈높이 {eye_z:.2f} m / 화면 상단 {top_z:.2f} m",
+        f"{label} — 거리 {dist_cm:.0f} cm · 상단 {top[2]:.2f} m · 기울기 {tilt_deg:+.0f}°",
         f_title,
     )
     draw_tag(
         dr,
-        (18, h_main - 42),
-        "빨간 점: 눈 중심(eye_center) · 초록 점: 화면 상단(monitor_top) · 파란 점: 웹캠",
+        (18, h_main - 40),
+        "빨간 점: 눈 중심 · 초록 점: 화면 상단 · 노란 점: 화면 중심 · 파란 점: 웹캠",
         f_sub,
     )
     draw_tag(dr, (w_main + 18, 16), "웹캠 시점 (webcam, fovy 75°)", f_title)
@@ -100,9 +105,15 @@ def render_pose(m: mujoco.MjModel, key_name: str, label: str, out_name: str) -> 
 
 def main() -> None:
     m = mujoco.MjModel.from_xml_path(str(SCENE))
-    render_pose(m, "seated", "앉은 자세 (seated)", "scene_seated.png")
-    render_pose(m, "standing", "선 자세 (standing)", "scene_standing.png")
-    print("saved:", OUT / "scene_seated.png", OUT / "scene_standing.png")
+    poses = [
+        ("seated", "똑바로 앉기 (seated)", "scene_seated.png"),
+        ("lean_forward", "앞으로 숙이기 (lean_forward)", "scene_lean_forward.png"),
+        ("reclined", "의자에 기대 눕기 (reclined)", "scene_reclined.png"),
+        ("standing", "서기 (standing)", "scene_standing.png"),
+    ]
+    for key, label, fname in poses:
+        render_pose(m, key, label, fname)
+    print("saved:", *[OUT / f for _, _, f in poses])
 
 
 if __name__ == "__main__":
